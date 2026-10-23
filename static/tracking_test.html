@@ -1,0 +1,102 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Food Delivery Live Tracking Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 850px;
+      margin: 30px auto;
+      padding: 0 16px;
+    }
+    label { display: block; margin-top: 12px; }
+    input { width: 100%; padding: 9px; box-sizing: border-box; }
+    button { margin: 12px 8px 12px 0; padding: 10px 16px; }
+    #status { font-weight: bold; }
+    pre {
+      background: #f3f4f6;
+      padding: 14px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+<body>
+  <h1>Live Order Tracking</h1>
+
+  <label for="token">Access token</label>
+  <input id="token" type="password" autocomplete="off"
+         placeholder="Paste your JWT access token">
+
+  <label for="orderId">Order ID</label>
+  <input id="orderId" type="number" min="1" value="1">
+
+  <button id="connect">Connect</button>
+  <button id="disconnect" disabled>Disconnect</button>
+
+  <p>Connection: <span id="status">Disconnected</span></p>
+  <h2>Latest tracking update</h2>
+  <pre id="output">No tracking data yet.</pre>
+
+  <script>
+    let socket = null;
+
+    const status = document.getElementById("status");
+    const output = document.getElementById("output");
+    const connectButton = document.getElementById("connect");
+    const disconnectButton = document.getElementById("disconnect");
+
+    connectButton.addEventListener("click", () => {
+      if (socket) socket.close();
+
+      const token = document.getElementById("token").value.trim();
+      const orderId = document.getElementById("orderId").value.trim();
+
+      if (!token || !orderId) {
+        output.textContent = "Enter both the access token and order ID.";
+        return;
+      }
+
+      const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+      const url = `${scheme}//${location.host}/ws/orders/${encodeURIComponent(orderId)}?token=${encodeURIComponent(token)}`;
+
+      socket = new WebSocket(url);
+      status.textContent = "Connecting...";
+
+      socket.onopen = () => {
+        status.textContent = "Connected";
+        connectButton.disabled = true;
+        disconnectButton.disabled = false;
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          output.textContent = JSON.stringify(data, null, 2);
+        } catch {
+          output.textContent = event.data;
+        }
+      };
+
+      socket.onerror = () => {
+        status.textContent = "Connection error";
+      };
+
+      socket.onclose = (event) => {
+        status.textContent =
+          `Disconnected (code ${event.code})`;
+        connectButton.disabled = false;
+        disconnectButton.disabled = true;
+        socket = null;
+      };
+    });
+
+    disconnectButton.addEventListener("click", () => {
+      if (socket) socket.close(1000, "Disconnected by user");
+    });
+  </script>
+</body>
+</html>
